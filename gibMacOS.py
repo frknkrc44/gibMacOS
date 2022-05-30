@@ -312,11 +312,11 @@ class gibMacOS:
                 print("")
             print("Downloading {} for {}...".format(os.path.basename(x), name))
             print("")
-            try:
-                self.d.stream_to_file(x, os.path.join(os.getcwd(), self.saves, self.current_catalog, name, os.path.basename(x)))
-                done.append({"name":os.path.basename(x), "status":True})
-            except:
-                done.append({"name":os.path.basename(x), "status":False})
+            # try:
+            self.d.stream_to_file(x, os.path.join(os.getcwd(), self.saves, self.current_catalog, name, os.path.basename(x)))
+            done.append({"name":os.path.basename(x), "status":True})
+            # except BaseException:
+            #     done.append({"name":os.path.basename(x), "status":False})
         succeeded = [x for x in done if x["status"]]
         failed    = [x for x in done if not x["status"]]
         self.u.head("Downloaded {} of {}".format(len(succeeded), len(dl_list)))

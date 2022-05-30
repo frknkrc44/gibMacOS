@@ -12,7 +12,7 @@ class Downloader:
 
     def __init__(self,**kwargs):
         self.ua = kwargs.get("useragent",{"User-Agent":"Mozilla"})
-        self.chunk = 1048576 # 1024 x 1024 i.e. 1MiB
+        self.chunk = 1024 * 4 # 1024 x 1024 i.e. 1MiB
         if os.name=="nt": os.system("color") # Initialize cmd for ANSI escapes
         # Provide reasonable default logic to workaround macOS CA file handling 
         cafile = ssl.get_default_verify_paths().openssl_cafile
@@ -38,7 +38,7 @@ class Downloader:
         headers = self.ua if headers == None else headers
         # Wrap up the try/except block so we don't have to do this for each function
         try:
-            response = urlopen(Request(url, headers=headers), context=self.ssl_context)
+            response = urlopen(Request(url, headers=headers), context=self.ssl_context, timeout=5)
         except Exception as e:
             # No fixing this - bail
             return None
@@ -116,17 +116,34 @@ class Downloader:
         return chunk_so_far
 
     def stream_to_file(self, url, file_path, progress = True, headers = None):
-        response = self.open_url(url, headers)
-        if response == None: return None
         bytes_so_far = 0
-        try: total_size = int(response.headers['Content-Length'])
-        except: total_size = -1
-        with open(file_path, 'wb') as f:
-            while True:
-                chunk = response.read(self.chunk)
-                bytes_so_far += len(chunk)
-                if progress: self._progress_hook(bytes_so_far,total_size)
-                if not chunk: break
-                f.write(chunk)
-        if progress: print("") # Add a newline so our last progress prints completely
-        return file_path if os.path.exists(file_path) else None
+        total_size = 0
+        while True:
+            response = self.open_url(url, headers)
+            if response:
+                if total_size < 1:
+                    try: total_size = int(response.headers['Content-Length'])
+                    except: total_size = -1
+
+                try:
+                    with open(file_path, 'ab') as f:
+                        chunk = 9999
+                        while chunk:
+                            chunk = response.read(self.chunk)
+                            bytes_so_far += len(chunk)
+                            if progress: self._progress_hook(bytes_so_far,total_size)
+                            f.write(chunk)
+                except:
+                    pass
+
+            if bytes_so_far == total_size:
+                break
+            else:
+                print('\nConnection closed, retrying in 5 seconds')
+                if not headers:
+                    headers = {}
+                headers['Range'] = 'bytes=%d-' % bytes_so_far
+                time.sleep(5)
+                
+            if progress: print("") # Add a newline so our last progress prints completely
+        return file_path if (os.path.exists(file_path) and bytes_so_far == total_size) else None
